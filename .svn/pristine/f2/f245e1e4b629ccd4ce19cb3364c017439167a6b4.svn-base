@@ -1,0 +1,22 @@
+<resources>
+
+    <string name="app_name">AutoInbox</string>
+    <string name="menu_settings">Settings</string>
+    <string name="title_activity_message_list">MessageList</string>
+    <string name="tab_4s">4S Store</string>
+    <string name="tab_system">System</string>
+    <string name="tab_stores">Stores</string>
+    <string name="call_4s_text">Call</string>
+    <string name="nav_4s_text">Navigate</string>
+    <string name="newer">Newer</string>
+    <string name="older">Older</string>
+    <string name="permission_access_provider_label">Access AutoInbox Data</string>
+    <string name="permission_access_provider_desc">Access AutoInbox Data</string>
+    <string name="call_number_nonexistent">You dial the number that make nonexistent</string>
+    <string name="no_navigate_application">The Navigate Application installation did not succeed or it\'s status is disable</string>
+    <string name="action_call">CALL</string>
+    <string name="action_navigate">NAVIGATE</string>
+    <string name="action_delete">DELETE</string>
+    <string name="auto__widget_init">Sorry,no message.Please click view to check</string>
+    <string name="widget_no_message">Sorry,there is no message</string>
+</resources>

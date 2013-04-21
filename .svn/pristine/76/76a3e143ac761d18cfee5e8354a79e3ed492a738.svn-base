@@ -1,0 +1,75 @@
+package com.borqs.ai.activity;
+
+import java.util.LinkedList;
+import java.util.List;
+
+import android.graphics.Color;
+import android.os.Bundle;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentActivity;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentTransaction;
+import android.util.Log;
+import android.view.Gravity;
+import android.view.Menu;
+import android.view.Window;
+import android.widget.LinearLayout;
+import android.widget.TabWidget;
+import android.widget.TextView;
+import android.widget.TabHost.TabSpec;
+
+import com.borqs.ai.AutoInbox;
+import com.borqs.ai.MessageProvider;
+import com.borqs.ai.R;
+import com.borqs.ai.provider.AutoInboxContent.Message;
+
+public class AutoInboxActivity extends FragmentActivity
+        implements SelectionFragment.Callback, MessageListFragment.Callback {
+
+    private int mProviderType;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        setContentView(R.layout.auto_inbox_activity);
+        onOpenMessageList(mProviderType, Message.NO_MESSAGE);
+    }
+    
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.auto_inbox_activity, menu);
+        return true;
+    }
+
+    private void onOpenMessageList(int providerType, long messageId) {
+        mProviderType = providerType;
+        
+        MessageListFragment messageList = (MessageListFragment) 
+                getSupportFragmentManager().findFragmentById(R.id.message_list_fragment);
+        
+        if (messageList != null) {
+            messageList.updateMessageList(mProviderType);
+        }
+    }
+    
+    // Implement SelectionFragment.Callback
+    @Override
+    public void onTabSelected(int providerType) {
+        onOpenMessageList(providerType, Message.NO_MESSAGE);
+    }
+    
+    // Implement MessageListFragment.Callback
+    @Override
+    public void onMessageSelected(long messageId) {
+        onOpenMessage(messageId);
+    }
+
+    private void onOpenMessage(long messageId) {
+        MessageViewFragment messageView = (MessageViewFragment) 
+                getSupportFragmentManager().findFragmentById(R.id.message_view_fragment);
+        if (messageView != null) {
+            messageView.updateContent(messageId);
+        }
+    }
+}

@@ -1,0 +1,314 @@
+package com.borqs.ai.provider;
+
+import android.content.ContentProvider;
+import android.content.ContentResolver;
+import android.content.ContentUris;
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.UriMatcher;
+import android.database.Cursor;
+import android.database.SQLException;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+import android.net.Uri;
+import android.util.Log;
+
+import com.borqs.ai.AutoInbox;
+import com.borqs.ai.provider.AutoInboxContent.Message;
+import com.borqs.ai.provider.AutoInboxContent.MessageColumns;
+import com.borqs.ai.provider.AutoInboxContent.Report;
+import com.borqs.ai.provider.AutoInboxContent.ReportColumns;
+import com.borqs.ai.provider.AutoInboxContent._4SStore;
+import com.borqs.ai.provider.AutoInboxContent._4SStoreColumns;
+
+public class AutoInboxProvider extends ContentProvider {
+    
+    private static final String DATABASE_NAME = "AutoInbox.db";
+    public static final int DATABASE_VERSION = 1;
+    
+    public static final String AUTOINBOX_AUTHORITY = "com.borqs.ai.provider";
+    
+    private static final int MESSAGE_BASE = 0x0000;
+    private static final int MESSAGE = MESSAGE_BASE;
+    private static final int MESSAGE_ID = MESSAGE_BASE + 1;
+    
+    private static final int _4S_STORE_BASE = 0x1000;
+    private static final int _4S_STORE = _4S_STORE_BASE;
+    private static final int _4S_STORE_ID = _4S_STORE_BASE + 1;
+    
+    private static final int Report_BASE = 0x2000;
+    private static final int REPORT = Report_BASE;
+    private static final int REPORT_ID= Report_BASE + 1;
+
+    
+    private static final String[] TABLE_NAMES = {
+        AutoInboxContent.Message.TABLE_NAME,
+        AutoInboxContent._4SStore.TABLE_NAME,
+        AutoInboxContent.Report.TABLE_NAME
+    };
+    
+    private static final UriMatcher sURIMatcher = new UriMatcher(UriMatcher.NO_MATCH);
+    private static final int BASE_SHIFT = 12;
+    
+    static {
+        UriMatcher matcher = sURIMatcher;
+        
+        matcher.addURI(AUTOINBOX_AUTHORITY, "message", MESSAGE);
+        matcher.addURI(AUTOINBOX_AUTHORITY, "message/#", MESSAGE_ID);
+        
+        matcher.addURI(AUTOINBOX_AUTHORITY, "4s_store", _4S_STORE);
+        matcher.addURI(AUTOINBOX_AUTHORITY, "4s_store/#", _4S_STORE_ID);
+        
+        matcher.addURI(AUTOINBOX_AUTHORITY, "report", REPORT);
+        matcher.addURI(AUTOINBOX_AUTHORITY, "report/#", REPORT_ID);
+    }
+
+    static void createMessageTable(SQLiteDatabase db) {
+        String messageColumns = MessageColumns.SUBJECT + " text, "
+            + MessageColumns.BODY + " text, "
+            + MessageColumns.SENDER_ID + " text, "
+            + MessageColumns.SENDER_NAME + " text, "
+            + MessageColumns.TYPE + " integer, "
+            + MessageColumns.SERVER_ID + " integer, "
+            + MessageColumns.FLAG_READ + " integer, "
+            + MessageColumns.TIMESTAMP + " integer"
+            + ");";
+        
+        String createString = " (" + AutoInboxContent.RECORD_ID 
+            + " integer primary key autoincrement, "
+            + messageColumns;
+        
+        db.execSQL("create table " + Message.TABLE_NAME + createString);
+        
+        // Later to add index
+    }
+    
+
+    static void create4SStoreTable(SQLiteDatabase db) {
+        String _4sStoreColumns = _4SStoreColumns.NAME + " text, "
+                + _4SStoreColumns._4S_ID + " text, "
+                + _4SStoreColumns.TELEPHONE + " text, "
+                + _4SStoreColumns.ADDRESS + " text, "
+                + _4SStoreColumns.LNG + " double, "
+                + _4SStoreColumns.LAT + " double "
+                +");";
+        String createString = "(" + AutoInboxContent.RECORD_ID
+                + " integer primary key autoincrement, "
+                + _4sStoreColumns;
+        
+        db.execSQL("create table " + _4SStore.TABLE_NAME + createString);
+    }
+    
+    static void createReportTable(SQLiteDatabase db) {
+        String reportColumns = ReportColumns.MESSAGE_KEY + " integer, "
+                + ReportColumns.REPORT_TYPE + " integer"
+                +");";
+        String createString = "(" + AutoInboxContent.RECORD_ID
+                + " integer primary key autoincrement, "
+                + reportColumns;
+        
+        db.execSQL("create table " + Report.TABLE_NAME + createString);
+    }
+    
+    static void resetMessageTable(SQLiteDatabase db, int oldVersion, int newVersion) {
+        try {
+            db.execSQL("drop table " + Message.TABLE_NAME);
+        } catch (SQLException e) {
+        }
+        
+        createMessageTable(db);
+    }
+    static void reset_4SStoreTable(SQLiteDatabase db, int oldVersion, int newVersion) {
+        try {
+            db.execSQL("drop table " + _4SStore.TABLE_NAME);
+        } catch(SQLException e) {
+            
+        }
+        
+    }
+    private SQLiteDatabase mDatabase;
+    
+    public synchronized SQLiteDatabase getDatabase(Context context) {
+        // Always return the cached database
+        if (mDatabase != null) {
+            return mDatabase;
+        }
+        
+        DatabaseHelper helper = new DatabaseHelper(context, DATABASE_NAME);
+        mDatabase = helper.getWritableDatabase();
+        return mDatabase;
+    }
+    
+    private class DatabaseHelper extends SQLiteOpenHelper {
+        DatabaseHelper(Context context, String name) {
+            super(context, name, null, DATABASE_VERSION);
+        }
+        
+        @Override
+        public void onCreate(SQLiteDatabase db) {
+            if (AutoInbox.DEBUG) {
+                Log.d(AutoInbox.TAG, "Creating AutoInbox database");
+            }
+            createMessageTable(db);
+            create4SStoreTable(db);
+            createReportTable(db);
+        }
+        
+        @Override
+        public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+            // TODO Auto-generated method stub
+        }
+        
+    }
+    
+    @Override
+    public int delete(Uri uri, String selection, String[] selectionArgs) {
+        // TODO Auto-generated method stub
+        int match = findMatch(uri, "delete");
+        Context context = this.getContext();
+        ContentResolver resolver = context.getContentResolver();
+        SQLiteDatabase db = getDatabase(context);
+        int table = match >> BASE_SHIFT;
+        int result = 0;
+        String id = "0";
+
+        switch (match) {
+        case MESSAGE_ID:
+            id = uri.getPathSegments().get(1);
+            result = db.delete(TABLE_NAMES[table], whereWithId(id, selection),
+                    selectionArgs);
+            break;
+        case _4S_STORE_ID:
+            break;
+        case REPORT:
+            result = db.delete(TABLE_NAMES[table], selection, selectionArgs);
+            break;
+        }
+        resolver.notifyChange(Message.CONTENT_URI, null);
+        return result;
+    }
+
+    @Override
+    public String getType(Uri arg0) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public Uri insert(Uri uri, ContentValues values) {
+        int match = sURIMatcher.match(uri);
+        Context context = this.getContext();
+        
+        SQLiteDatabase db = getDatabase(context);
+        int table = match >> BASE_SHIFT;
+        long id;
+        
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, "AutoInbox.insert: uri=" + uri + ", match is " + match);
+        }
+        
+        Uri resultUri = null;
+        
+        switch (match) {
+        case MESSAGE:
+        case _4S_STORE:
+        case REPORT:
+            id = db.insert(TABLE_NAMES[table], "kong", values);
+            resultUri = ContentUris.withAppendedId(uri, id);
+            if (AutoInbox.DEBUG) {
+                Log.d(AutoInbox.TAG, "insert store_4S: " + resultUri + ", " + id);
+            }
+            break;
+        }
+        getContext().getContentResolver().notifyChange(AutoInboxContent.CONTENT_URI, null);
+        return resultUri;
+    }
+
+    @Override
+    public boolean onCreate() {
+        return false;
+    }
+
+    @Override
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
+            String sortOder) {
+        Cursor c = null;
+        // Uri notificationUri = AutoInboxContent.CONTENT_URI;
+        int match = sURIMatcher.match(uri);
+        Context context = getContext();
+        
+        SQLiteDatabase db = this.getDatabase(context);
+        int table = match >> BASE_SHIFT;
+        String id;
+        
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, "AutoInboxProvider.query: uri=" + uri + ", match is " + match);
+        }
+        
+        switch (match) {
+        case MESSAGE:
+        case _4S_STORE:
+        case REPORT:
+            c = db.query(TABLE_NAMES[table], projection, selection, selectionArgs, null, null, sortOder);
+            break;
+        case MESSAGE_ID:
+        case _4S_STORE_ID:
+        case REPORT_ID:
+            id = uri.getPathSegments().get(1);
+            c = db.query(TABLE_NAMES[table], projection,
+                    whereWithId(id, selection), selectionArgs, null, null, sortOder);
+            break;
+        }
+        if ((c != null) && !isTemporary()) {
+            c.setNotificationUri(getContext().getContentResolver(), uri);
+        }
+        return c;
+    }
+
+    private String whereWithId(String id, String selection) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("_id=")
+          .append(id);
+        if (selection != null) {
+            sb.append(" AND (")
+              .append(selection)
+              .append(')');
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+        int match = findMatch(uri, "update");
+        Context context = this.getContext();
+        ContentResolver resolver = context.getContentResolver();
+        
+        SQLiteDatabase db = this.getDatabase(context);
+        int table = match >> BASE_SHIFT;
+        int result = 0;
+        
+        String tableName = TABLE_NAMES[table];
+        String id = "0";
+        
+        switch (match) {
+        case MESSAGE_ID:
+        case _4S_STORE_ID:
+            id = uri.getPathSegments().get(1);
+            result = db.update(tableName, values, whereWithId(id, selection), selectionArgs);
+            break;
+        }
+        resolver.notifyChange(AutoInboxContent.CONTENT_URI, null);
+        return result;
+    }
+
+    private static int findMatch(Uri uri, String methodName) {
+        int match = sURIMatcher.match(uri);
+        if (match < 0) {
+            throw new IllegalStateException("Unknown uri: " + uri);
+        } else if (AutoInbox.DEBUG) {
+            Log.v(AutoInbox.TAG, methodName + ": uri=" + uri + ", match is " + match);
+        }
+        return match;
+    }
+
+}

@@ -1,0 +1,24 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal" >
+    <LinearLayout 
+        android:layout_weight="1"
+        android:layout_width="0dip"
+        android:layout_height="match_parent" >
+        <fragment android:name="com.borqs.ai.activity.SelectionFragment"
+            android:id="@+id/selection_fragment"
+            android:layout_width="70dip"
+            android:layout_height="match_parent" />
+        <fragment android:name="com.borqs.ai.activity.MessageListFragment"
+            android:id="@+id/message_list_fragment"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+    <fragment android:name="com.borqs.ai.activity.MessageViewFragment"
+        android:id="@+id/message_view_fragment"
+        android:layout_weight="1"
+        android:layout_width="0dip"
+        android:layout_height="match_parent" />
+</LinearLayout>

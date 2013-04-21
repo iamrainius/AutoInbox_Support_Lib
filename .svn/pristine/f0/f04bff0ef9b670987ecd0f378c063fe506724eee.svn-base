@@ -1,0 +1,30 @@
+<com.borqs.ai.activity.MyFragmentTabHost xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tabhost1"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" >
+    <LinearLayout android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" >
+        <LinearLayout
+            android:layout_weight="1"
+            android:layout_width="0dip"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+             >
+            <TabWidget
+                android:id="@android:id/tabs"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:tabStripEnabled="true" />
+            <FrameLayout
+                android:id="@android:id/tabcontent"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </LinearLayout>
+        <fragment android:name="com.borqs.ai.activity.MessageViewFragment"
+            android:id="@+id/message_view_fragment"
+            android:layout_weight="1"
+            android:layout_width="0dip"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+</com.borqs.ai.activity.MyFragmentTabHost>

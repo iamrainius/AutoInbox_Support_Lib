@@ -1,0 +1,107 @@
+package com.borqs.ai.activity;
+
+import java.util.LinkedList;
+import java.util.List;
+
+import android.graphics.Color;
+import android.os.Bundle;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentActivity;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentTransaction;
+import android.util.Log;
+import android.view.Gravity;
+import android.view.Menu;
+import android.view.Window;
+import android.widget.LinearLayout;
+import android.widget.TabWidget;
+import android.widget.TextView;
+import android.widget.TabHost.TabSpec;
+
+import com.borqs.ai.AutoInbox;
+import com.borqs.ai.MessageProvider;
+import com.borqs.ai.R;
+import com.borqs.ai.provider.AutoInboxContent.Message;
+
+public class AutoInboxActivity extends FragmentActivity {
+
+    private int mProviderType;
+    private MessageListFragment mMessageListFragment;
+	private MyFragmentTabHost mTabHost;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        setContentView(R.layout.tab_host);
+        
+        mTabHost = (MyFragmentTabHost) findViewById(R.id.tabhost1);
+        mTabHost.setup(this, getSupportFragmentManager(), android.R.id.tabcontent);
+        
+        TabWidget tabWidget = mTabHost.getTabWidget();
+        tabWidget.setOrientation(LinearLayout.VERTICAL);
+
+//        mTabHost.addTab(mTabHost.newTabSpec("4S").setIndicator("4S"),
+//                TriggerFragment.class, null);
+//        mTabHost.addTab(mTabHost.newTabSpec("System").setIndicator("System"),
+//                TriggerFragment.class, null);
+        addTab("4S", "4S", MessageListFragment.class);
+        addTab("System", "System", MessageListFragment.class);
+    }
+    
+    private void addTab(String text, String tag, Class<?> clss) {
+        TextView indicator = new TextView(this);
+        indicator.setLayoutParams(new LinearLayout.LayoutParams(
+                100, 0, 1));
+        indicator.setBackgroundResource(R.drawable.tab_bg);
+        indicator.setText(text);
+        indicator.setGravity(Gravity.CENTER);
+        indicator.setTextColor(Color.WHITE);
+        indicator.setTextAppearance(this, android.R.attr.textAppearanceMedium);
+        //indicator.setBackgroundResource(R.drawable.tab_bg_normal);
+        TabSpec spec = mTabHost.newTabSpec(tag)
+               .setIndicator(indicator);
+        mTabHost.addTab(spec, clss, null);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.auto_inbox_activity, menu);
+        return true;
+    }
+
+    private void onOpenMessageList(int providerType, long messageId) {
+        mProviderType = providerType;
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, "open " + MessageProvider.getName(this, providerType));
+        }
+        
+        FragmentManager fm = this.getSupportFragmentManager();
+        final FragmentTransaction ft = fm.beginTransaction();
+        removeMessageListFragment(ft);
+        mMessageListFragment = (MessageListFragment) MessageListFragment.newInstance(providerType);
+        ft.add(R.id.message_list_fragment, mMessageListFragment);
+        mRemovedFragments.remove(mMessageListFragment);
+        
+        if (messageId != Message.NO_MESSAGE) {
+            //updateMessageView(ft, messageId);
+        }
+        
+        if (!ft.isEmpty()) {
+            ft.commitAllowingStateLoss();
+        }
+        
+        fm.executePendingTransactions();
+    }
+
+    private final List<Fragment> mRemovedFragments = new LinkedList<Fragment>();
+    private void removeMessageListFragment(FragmentTransaction ft) {
+        if (mMessageListFragment == null) {
+            return;
+        }
+        if (!mRemovedFragments.contains(mMessageListFragment)) {
+            ft.remove(mMessageListFragment);
+            mRemovedFragments.add(mMessageListFragment);
+        }
+    }
+}

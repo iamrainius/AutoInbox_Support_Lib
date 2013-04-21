@@ -1,0 +1,141 @@
+package com.borqs.ai.activity;
+
+import java.text.DateFormat;
+import java.util.Date;
+
+import android.content.Context;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.support.v4.app.Fragment;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.TextView;
+
+import com.borqs.ai.Controller;
+import com.borqs.ai.R;
+import com.borqs.ai.provider.AutoInboxContent.Message;
+import com.borqs.ai.provider.AutoInboxContent._4SStore;
+import com.borqs.ai.utility.Utilities;
+
+public class MessageViewFragment extends Fragment implements OnClickListener {
+
+    private Button mCall;
+    private Button mNavigate;
+    private Button mDelete;
+    private TextView mSubject;
+    private TextView mSender;
+    private TextView mMessageContent;
+    private TextView mDatetime;
+    public Object m4SStore;
+    public DateFormat mMessageDateFormat;
+    private LoadMessageTask mLoadMessageTask;
+
+    private Message mMessage;
+    
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+            Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.message_view_view, container, false);
+        mCall = (Button) view.findViewById(R.id.action_call);
+        mCall.setVisibility(View.VISIBLE);
+        mCall.setOnClickListener(this);
+        
+        mNavigate = (Button) view.findViewById(R.id.action_navi);
+        mNavigate.setVisibility(View.VISIBLE);
+        mNavigate.setOnClickListener(this);
+        
+        mDelete = (Button) view.findViewById(R.id.action_delete);
+        mDelete.setOnClickListener(this);
+        
+        mSubject = (TextView) view.findViewById(R.id.message_subject);
+        mSender = (TextView) view.findViewById(R.id.message_sender);
+        mDatetime = (TextView) view.findViewById(R.id.message_datetime);
+        mMessageContent = (TextView) view.findViewById(R.id.message_content);
+        
+        return view;
+    }
+
+    public void updateContent(long messageId) {
+        rescheduleLoadMessageTask(messageId);
+    }
+    
+    @SuppressWarnings("unchecked")
+    private void rescheduleLoadMessageTask(long messageId) {
+        Utilities.cancelTaskInterrupt(mLoadMessageTask);
+        mLoadMessageTask = new LoadMessageTask(messageId);
+        mLoadMessageTask.execute();
+    }
+    
+    private class LoadMessageTask extends AsyncTask<Void, Void, Void> {
+        private long mMessageId = Message.NO_MESSAGE;
+        public LoadMessageTask(long messageId) {
+            mMessageId = messageId;
+        }
+
+        @Override
+        protected Void doInBackground(Void... params) {
+            if (mMessageId == Message.NO_MESSAGE) {
+                mMessage = null;
+                return null;
+            }
+            
+            Context context = getActivity();
+            mMessage = Message.restoreMessageWithId(context, mMessageId);
+            if(mMessage == null){
+                   return null;
+            }
+            if(mMessage.mType == Message.TYPE_MESSAGE_4S){
+                m4SStore = _4SStore.restore4SStoreWithMessage(context, mMessage);
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void result) {
+            clearMessageView();
+            if (mMessage == null) {
+                return;
+            }
+            
+            int messageType = mMessage.mType;
+            if (messageType == Message.TYPE_MESSAGE_4S) {
+                mCall.setVisibility(View.VISIBLE);
+                mNavigate.setVisibility(View.VISIBLE);
+            } else {
+                mCall.setVisibility(View.GONE);
+                mNavigate.setVisibility(View.GONE);
+            }
+            
+            long timestamp = mMessage.mTimeStamp;
+            Date date = new Date(timestamp);
+            mSubject.setText(mMessage.mSubject);
+            mSender.setText(mMessage.mSenderName);
+            mMessageDateFormat = android.text.format.DateFormat.getDateFormat(getActivity().getApplicationContext());
+            mDatetime.setText(mMessageDateFormat.format(date));
+            mMessageContent.setText(mMessage.mBody);
+            
+            setRead(mMessage);
+        }
+    }
+    
+    private void setRead(Message message) {
+        Controller.getInstance(getActivity()).setMessageRead(message);
+    }
+    
+    private void clearMessageView() {
+        mSender.setText("");
+        mSubject.setText("");
+        mDatetime.setText("");
+        mMessageContent.setText("");
+        mCall.setVisibility(View.GONE);
+        mNavigate.setVisibility(View.GONE);
+    }
+
+    @Override
+    public void onClick(View view) {
+        
+    }
+}

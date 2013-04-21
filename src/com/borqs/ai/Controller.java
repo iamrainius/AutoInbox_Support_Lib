@@ -1,0 +1,135 @@
+package com.borqs.ai;
+
+import java.util.HashSet;
+import java.util.Iterator;
+
+import android.content.ContentResolver;
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.util.Log;
+import android.widget.Toast;
+
+import com.borqs.ai.activity.MessageList;
+import com.borqs.ai.provider.AutoInboxContent.Message;
+
+public class Controller {
+    private static Controller sInstance;
+    private Context mContext = null;
+    private MessagingController mMessagingController;
+    private Controller(Context context) {
+        mContext = context;
+        mMessagingController = MessagingController.getInstance(mContext);
+    }
+    
+    public synchronized static Controller getInstance(Context context) {
+        if (sInstance == null) {
+            sInstance = new Controller(context);
+        }
+        
+        return sInstance;
+    }
+
+    /**
+     * Launch a check to the server for new messages,
+     * and persist the messages to the database
+     */
+    public synchronized void checkMessages() {
+        new Thread() {
+            // The process of the business MUST to be moved into MessagingController
+            // to run from a blocking queue
+            @Override
+            public void run() {
+                if (AutoInbox.DEBUG) {
+                    Log.d(AutoInbox.TAG, "controller: check messages");
+                }
+                mMessagingController.checkMessages();
+            }
+        }.start();
+    }
+    
+    /**
+     * 
+     * @param serverId
+     */
+    public synchronized void setMessageRead(final Message message) {
+        new Thread() {
+            @Override
+            public void run() {
+                // Next to move this to MessagingController to process in the queue
+                if (AutoInbox.DEBUG) {
+                    Log.d(AutoInbox.TAG, "controller: report message read, serverId=" + message.mServerId);
+                }
+                mMessagingController.setMessageRead(message);
+            }
+        }.start();
+    }
+
+    public void deleteMessage(final long messageId) {
+        new Thread() {
+            @Override
+            public void run() {
+                // Next to move this to MessagingController to process in the queue
+                if (AutoInbox.DEBUG) {
+                    Log.d(AutoInbox.TAG, "controller: delete message, messageId=" + messageId);
+                }
+                mMessagingController.deleteMessage(messageId);
+            }
+        }.start();
+    }
+    
+    public void deleteSelectedMessage(final HashSet<Long> selectedSet) {
+        new Thread() {
+            long[] ids = returnIds(selectedSet); 
+            @Override
+            public void run() {
+                // Next to move this to MessagingController to process in the queue
+                for(int i =0; i<selectedSet.size(); i++){
+                    if (AutoInbox.DEBUG) {
+                        Log.d(AutoInbox.TAG, "controller: delete checked messages, messageId=" + ids[i]);
+                    }
+                mMessagingController.deleteMessage(ids[i]);
+                }
+            }
+        }.start();
+    }
+    
+    private long[] returnIds(HashSet<Long> set) {
+        long[] ids = new long[set.size()];
+        Iterator<Long> it = set.iterator();
+        int i = 0;
+        while (it.hasNext()) {
+            long id = (Long) it.next();
+            ids[i++] = id;
+        }
+
+        return ids;
+    }
+    
+    public void call4sStore(final String telephone){
+        new Thread() {
+            @Override
+            public void run() {
+                // Next to move this to MessagingController to process in the queue
+                if (AutoInbox.DEBUG) {
+                    Log.d(AutoInbox.TAG, "controller: call 4SStore, 4sTelephone=" + telephone);
+                }
+                mMessagingController.call4sStore(telephone);
+            }
+        }.start();
+    }
+    
+
+    public void nagi4SStore(final double _4SLng,final double _4SLat) {
+        new Thread() {
+            @Override
+            public void run() {
+                // Next to move this to MessagingController to process in the queue
+                if (AutoInbox.DEBUG) {
+                    Log.d(AutoInbox.TAG, "controller: nagi 4SStore, 4SLng:" + _4SLng +" ; 4SLat:" + _4SLat);
+                }
+                mMessagingController.nagi4SStore(_4SLng, _4SLat);
+            }
+        }.start();
+    }
+}

@@ -1,0 +1,14 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/menu_settings"
+        android:title="@string/menu_settings"
+        android:orderInCategory="100" />
+    <item android:id="@+id/menu_add_messages"
+        android:title="@string/menu_add_messages"
+        android:orderInCategory="100" />
+    <item android:id="@+id/menu_refresh"
+        android:title="@string/menu_refresh"
+        android:orderInCategory="100" />
+    <item android:id="@+id/menu_select"
+        android:title="@string/menu_multiselect"
+        android:orderInCategory="100" />
+</menu>

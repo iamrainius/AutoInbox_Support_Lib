@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+    <item key='resp_status'>OK</item>
+    <item key='resp_data'>
+        <item key='name'>test_store</item>
+        <item key='telephone'>13800138000</item>
+        <item key='address'>wangjing</item>
+        <item key='lng'>1</item>
+        <item key='lat'>2</item>
+    </item>
+</root>

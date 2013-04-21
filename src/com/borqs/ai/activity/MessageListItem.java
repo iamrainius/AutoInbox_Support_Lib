@@ -1,0 +1,23 @@
+package com.borqs.ai.activity;
+
+import android.content.Context;
+import android.util.AttributeSet;
+import android.widget.CheckBox;
+import android.widget.RelativeLayout;
+
+class MessageListItem extends RelativeLayout {
+    public long mMessageId;
+    public CheckBox checkedView;
+
+    public MessageListItem(Context context) {
+        super(context);
+    }
+
+    public MessageListItem(Context context, AttributeSet attrs, int defStyle) {
+        super(context, attrs, defStyle);
+    }
+
+    public MessageListItem(Context context, AttributeSet attrs) {
+        super(context, attrs);
+    }
+}

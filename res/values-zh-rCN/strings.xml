@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">车载收件箱</string>
+    <string name="menu_settings">设置</string>
+    <string name="menu_refresh">刷新</string>
+    <string name="menu_multiselect">多选</string>
+    <string name="menu_add_messages">添加测试信息</string>
+    <string name="title_activity_message_list">车载收件箱</string>
+    <string name="tab_4s">4S店\n信息</string>
+    <string name="tab_system">系统\n信息</string>
+    <string name="tab_stores">商户\n信息</string>
+    <string name="call_4s_text">呼叫</string>
+    <string name="nav_4s_text">导航</string>
+    <string name="call_number_nonexistent">电话号码有误</string>
+    <string name="no_navigate_application">请检查是否已经安装导航程序</string>
+    <string name="action_call">呼叫</string>
+    <string name="action_navigate">导航</string>
+    <string name="action_delete">删除</string>
+    <string name="auto__widget_init">没有信息。请点击进行查看</string>
+    <string name="location_services_notopened">请检查"位置服务"是否打开</string>
+    <string name="getlocation_null">无法获取位置，请重试</string>
+    <string name="strNoRecordsFound">没有信息</string>
+</resources>

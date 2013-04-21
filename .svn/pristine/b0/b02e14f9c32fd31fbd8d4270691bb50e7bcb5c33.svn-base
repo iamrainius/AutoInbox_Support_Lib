@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+    <item key='resp_status'>OK</item>
+    <item key='resp_data'>
+        <item key='0'>
+            <item key='msg_id'>1</item>
+            <item key='title'>title1</item>
+            <item key='content'>content1</item>
+            <item key='msg_type'>1</item>
+            <item key='sender_id'>sender1</item>
+            <item key='sender_name'>Sender1</item>
+            <item key='send_timestamp'>2012-10-18 16:46:17</item>
+        </item>
+        <item key='1'>
+            <item key='msg_id'>2</item>
+            <item key='title'>title2</item>
+            <item key='content'>content2</item>
+            <item key='msg_type'>3</item>
+            <item key='sender_id'>sender2</item>
+            <item key='sender_name'>Sender2</item>
+            <item key='send_timestamp'>2012-10-18 16:54:41</item>
+        </item>
+    </item>
+</root>

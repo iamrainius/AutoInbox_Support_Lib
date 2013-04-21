@@ -1,0 +1,605 @@
+package com.borqs.ai.activity;
+
+import java.util.ArrayList;
+import java.util.Date;
+
+import android.app.TabActivity;
+import android.content.ActivityNotFoundException;
+import android.content.ContentResolver;
+import android.content.Context;
+import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.Color;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.net.Uri;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.Button;
+import android.widget.CursorAdapter;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.TabHost;
+import android.widget.TabHost.TabSpec;
+import android.widget.TabWidget;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.borqs.ai.AutoInbox;
+import com.borqs.ai.Controller;
+import com.borqs.ai.R;
+import com.borqs.ai.provider.AutoInboxContent.Message;
+import com.borqs.ai.provider.AutoInboxContent._4SStore;
+import com.borqs.ai.utility.Utilities;
+import com.borqs.ai.widget.WidgetDatabaseObserver;
+
+public class MessageList extends TabActivity
+        implements OnItemClickListener, OnClickListener, TabHost.OnTabChangeListener, LocationListener {
+    
+    private static final String TAG_4S_TAB = "4S";
+    private static final String TAG_SYSTEM_TAB = "System";
+    private static final String TAG_STORES_TAB = "Stores";
+    
+    final static String LATITUDE_KEY = "latitude";
+    final static String LONGITUDE_KEY = "longitude";
+    final static String ACTION_MAP_COMMAND = "android.intent.action.map.command";
+    final static String COMMAND_KEY = "command";
+    final static String COMMAND_DAY_MODE = "day";
+    final static String COMMAND_NIGHT_MODE = "night";
+    final static String COMMAND_SATELLITE_TYPE = "satellite";
+    final static String COMMAND_STREET_TYPE = "street";
+    final static String COMMAND_TRAFFIC_TYPE = "traffic";
+    final static String ACTION_MAP_VIEW = "android.intent.action.map.view";
+    final static String POINTLIST_KEY = "pointList";
+    final static String ACTION_MAP_POI = "android.intent.action.map.poi";
+    final static String POI_RADIUS_KEY = "poiRadius";
+    final static String POI_TYPE_KEY = "poiType";
+    final static String POI_HOTEL = "hotel";
+    final static String POI_PARK = "park";
+    final static String ACTION_MAP_ROUTE = "android.intent.action.map.route";
+    final static String ROUTE_TYPE_KEY = "routeType";
+    final static String ROUTE_NEAREST = "nearest";
+    final static String ROUTE_FASTEST = "fastest";
+    
+    final static int TAB_ID_SYSTEM = 0;
+    final static int TAB_ID_4S = 1;
+    final static int TAB_ID_STORES = 2;
+    
+    final static String GETACTION_VIEW_MESSAGE = "intent.action.VIEW_MESSAGE";
+    public final static String SELECTED_MESSAGE_TYPE = "selectedMessageType";
+    
+    private static final String[] MESSAGE_LIST_PROJECTION = {
+        Message.ID, Message.SUBJECT, Message.BODY, 
+        Message.FLAG_READ, Message.TIMESTAMP
+    };
+    
+    public static final int SNIPPET_MAX_LENGTH = 30;
+    
+    private final Controller mController = Controller.getInstance(this);
+    
+    private MessageListAdapter mAdapter;
+    private LoadMessageListTask mLoadMessageListTask;
+    private ListView mListView;
+    private TabHost mTabHost;
+    private Button mCall;
+    private Button mNavigate;
+    private Button mDelete;
+    private TextView mSubject;
+    private TextView mSender;
+    private TextView mDatetime;
+    private TextView mMessageContent;
+    private Message mMessage;
+    private _4SStore m4SStore;
+    private java.text.DateFormat mMessageDateFormat;
+    private LoadMessageTask mLoadMessageTask;
+    private LocationManager mLocationManager;
+    private Intent mIntent;
+    private int mSelectedType;
+    private int mSelectedPosition;
+    private WidgetDatabaseObserver mObserver;
+    
+    @Override
+    protected void onNewIntent(Intent intent) {
+        // TODO Auto-generated method stub
+        super.onNewIntent(intent);
+        setIntent(intent);
+        mSelectedType = intent.getIntExtra(SELECTED_MESSAGE_TYPE, Message.TYPE_MESSAGE_4S);
+        mAdapter = new MessageListAdapter(this);
+        mListView.setAdapter(mAdapter);
+        
+//        rescheduleLoadMessageListTask(getMessageType(TAG_4S_TAB));
+        rescheduleLoadMessageListTask(mSelectedType);
+        mTabHost.setCurrentTab(getTabIndex(mSelectedType));
+        Log.d("mSelectedType", mSelectedType+"onNewIntent");
+        
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, "MessageList Created");
+        }
+        super.onCreate(savedInstanceState);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        setContentView(R.layout.message_list);
+        mTabHost = this.getTabHost();
+        mIntent = getIntent();
+        mSelectedType = mIntent.getIntExtra(SELECTED_MESSAGE_TYPE, Message.TYPE_MESSAGE_4S);
+        
+        TabWidget tabWidget = mTabHost.getTabWidget();
+        tabWidget.setOrientation(LinearLayout.VERTICAL);
+
+        addTab(getString(R.string.tab_system), TAG_SYSTEM_TAB, R.id.system);
+        addTab(getString(R.string.tab_4s), TAG_4S_TAB, R.id._4s);
+        addTab(getString(R.string.tab_stores), TAG_STORES_TAB, R.id.stores);
+        
+        mTabHost.setCurrentTabByTag(TAG_4S_TAB);
+        mTabHost.setOnTabChangedListener(this);
+        
+        mCall = (Button) findViewById(R.id.action_call);
+        mCall.setVisibility(View.VISIBLE);
+        mCall.setOnClickListener(this);
+        
+        mNavigate = (Button) findViewById(R.id.action_navi);
+        mNavigate.setVisibility(View.VISIBLE);
+        mNavigate.setOnClickListener(this);
+        
+        mDelete = (Button) findViewById(R.id.action_delete);
+        mDelete.setOnClickListener(this);
+        
+        mListView = (ListView) this.findViewById(R.id.list);
+        mListView.setOnItemClickListener(this);
+        
+        mSubject = (TextView) this.findViewById(R.id.message_subject);
+        mSender = (TextView) this.findViewById(R.id.message_sender);
+        mDatetime = (TextView) this.findViewById(R.id.message_datetime);
+        mMessageContent = (TextView) this.findViewById(R.id.message_content);
+        
+        mAdapter = new MessageListAdapter(this);
+        mListView.setAdapter(mAdapter);
+        
+        mObserver = new WidgetDatabaseObserver(getApplicationContext());
+        getApplicationContext().getContentResolver().registerContentObserver(Message.CONTENT_URI, true,
+                mObserver);
+        
+        // Show the 4S messages by default, this MUST be associated with the
+        // default tab
+        rescheduleLoadMessageListTask(mSelectedType);
+        mTabHost.setCurrentTab(getTabIndex(mSelectedType));
+        Log.d("mSelectedType", mSelectedType+"onCreat");
+    }
+    
+    private void addTab(String text, String tag, int contentId) {
+        TextView indicator = new TextView(this);
+        indicator.setLayoutParams(new LinearLayout.LayoutParams(
+                100, 0, 1));
+        indicator.setBackgroundResource(R.drawable.tab_bg);
+        indicator.setText(text);
+        indicator.setGravity(Gravity.CENTER);
+        indicator.setTextColor(Color.WHITE);
+        indicator.setTextAppearance(this, android.R.attr.textAppearanceMedium);
+        //indicator.setBackgroundResource(R.drawable.tab_bg_normal);
+        TabSpec spec = mTabHost.newTabSpec(tag)
+               .setIndicator(indicator)
+               .setContent(contentId);
+        mTabHost.addTab(spec);
+    }
+
+    @Override
+    protected void onResume() {
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, "MessageList Resuming");
+        }
+        super.onResume();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, "MessageList destroying");
+        }
+        super.onDestroy();
+        
+        rescheduleLoadMessageListTask(Message.TYPE_MESSAGE_NO_TYPE);
+        rescheduleLoadMessageTask(Message.NO_MESSAGE);
+        mAdapter.changeCursor(null);
+    }
+
+    private class LoadMessageListTask extends AsyncTask<Void, Void, Cursor> {
+        private int mMessageType;
+
+        public LoadMessageListTask(int messageType) {
+            mMessageType = messageType;
+        }
+        
+        @Override
+        protected Cursor doInBackground(Void... params) {
+            String selection = Message.TYPE + "=" + mMessageType + " order by "
+                    + Message.RECORD_ID + " desc ";
+            Cursor c = MessageList.this.getContentResolver().query(
+                    Message.CONTENT_URI, MESSAGE_LIST_PROJECTION, selection, null, null);
+            c.setNotificationUri(getContentResolver(), Message.CONTENT_URI);
+            return c;
+        }
+
+        @Override
+        protected void onPostExecute(Cursor cursor) {
+            if (cursor == null || cursor.isClosed()) {
+                return;
+            }
+            
+            MessageList.this.mAdapter.changeCursor(cursor);
+            displayMessage();
+        }
+        
+        
+    }
+    
+    class MessageListAdapter extends CursorAdapter {
+        
+        public static final int COLUMN_ID = 0;
+        public static final int COLUMN_SUBJECT = 1;
+        public static final int COLUMN_BODY = 2;
+        public static final int COLUMN_FLAG_READ = 3;
+        public static final int COLUMN_TIMESTAMP = 4;
+        
+        private Context mContext;
+        private java.text.DateFormat mDateFormat;
+        private java.text.DateFormat mTimeFormat;
+        private LayoutInflater mInflater;
+        
+        
+        public MessageListAdapter(Context context) {
+            super(context, null, true);
+            mContext = context;
+            mDateFormat = android.text.format.DateFormat.getDateFormat(context);
+            mTimeFormat = android.text.format.DateFormat.getTimeFormat(context);
+            mInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        }
+        
+        @Override
+        public Object getItem(int position) {
+            // TODO Auto-generated method stub
+            return super.getItem(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            // TODO Auto-generated method stub
+            return super.getItemId(position);
+        }
+        
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            // TODO Auto-generated method stub
+            return super.getView(position, convertView, parent);
+        }
+
+        @Override
+        protected void onContentChanged() {
+//            Toast.makeText(getApplicationContext(), "content changed",
+//                    Toast.LENGTH_SHORT).show();
+            super.onContentChanged();
+        }
+
+        @Override
+        public void bindView(View view, Context context, Cursor cursor) {
+            MessageListItem itemView = (MessageListItem) view;
+            
+            itemView.mMessageId = cursor.getLong(COLUMN_ID);
+            
+            TextView subjectView = (TextView) view.findViewById(R.id.subject);
+            String subjectText = cursor.getString(COLUMN_SUBJECT);
+            subjectView.setText(subjectText);
+            
+            TextView snippetView = (TextView) view.findViewById(R.id.snippet);
+            String body = cursor.getString(COLUMN_BODY);
+            if (!TextUtils.isEmpty(body) && body.length() > SNIPPET_MAX_LENGTH) {
+                body = body.substring(0, SNIPPET_MAX_LENGTH);
+            }
+            snippetView.setText(body);
+            
+            TextView dateView = (TextView) view.findViewById(R.id.datetime);
+            long timestamp = cursor.getLong(COLUMN_TIMESTAMP);
+            
+            Date date = new Date(timestamp);
+            String dateText;
+            // we need add code to check whether the message comes within today
+            dateText = mDateFormat.format(date);
+            dateView.setText(dateText);
+            setHighlight(view, cursor.getPosition());
+        }
+        
+        @Override
+        public View newView(Context context, Cursor cursor, ViewGroup parent) {
+            return mInflater.inflate(R.layout.message_list_item, parent, false);
+        }
+    }
+    
+    private void displayMessage() {
+        long messageId = 0;
+        messageId = mAdapter.getItemId(mSelectedPosition);
+        onMessageOpen(messageId);
+    }
+    
+    
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+        // Highlight on current item
+        mSelectedPosition = position;
+        // Show the focused content to the message view
+      setHighlight(view, position);
+      displayMessage();
+    }
+
+    private void setHighlight(View view , int position) {
+        MessageListItem item = (MessageListItem) view;
+        item.requestFocusFromTouch();
+        
+        if (position == mSelectedPosition) {
+            view.setBackgroundResource(R.drawable.list_item_hl);
+        } else {
+            view.setBackgroundDrawable(null);
+        }
+    }
+
+    private void onMessageOpen(long messageId) {
+        rescheduleLoadMessageTask(messageId);
+    }
+    
+    private class LoadMessageTask extends AsyncTask<Void, Void, Void> {
+        private long mMessageId = Message.NO_MESSAGE;
+        
+        public LoadMessageTask(long messageId) {
+            mMessageId = messageId;
+        }
+
+        @Override
+        protected Void doInBackground(Void... params) {
+            mMessage = Message.restoreMessageWithId(MessageList.this, mMessageId);
+            if(mMessage == null){
+                   return null;
+            }
+            if(mMessage.mType == Message.TYPE_MESSAGE_4S){
+                m4SStore = _4SStore.restore4SStoreWithMessage(MessageList.this, mMessage);
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void result) {
+            if (mMessage == null) {
+                clearMessageView();
+                return;
+            }
+            
+            long timestamp = mMessage.mTimeStamp;
+            Date date = new Date(timestamp);
+            mSubject.setText(mMessage.mSubject);
+            mSender.setText(mMessage.mSenderName);
+            mMessageDateFormat = android.text.format.DateFormat.getDateFormat(getApplicationContext());
+            mDatetime.setText(mMessageDateFormat.format(date));
+            mMessageContent.setText(mMessage.mBody);
+            
+            setRead(mMessage);
+        }
+
+        private void setRead(Message message) {
+            Controller.getInstance(MessageList.this).setMessageRead(message);
+        }
+    }
+
+    private void clearMessageView() {
+        mSelectedPosition = 0;
+        mMessage = null;
+        mSender.setText("");
+        mSubject.setText("");
+        mDatetime.setText("");
+        mMessageContent.setText("");
+    }
+    @Override
+    public void onTabChanged(String tabId) {
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, "tab changed: " + tabId);
+        }
+        clearMessageView();
+        // Firstly, let us start to check messages from the server
+        // When new messages saved, the list will be updated automatically
+        mController.checkMessages();
+        int messageType = getMessageType(tabId);
+        
+        // Unsupported type is not permitted
+        if (messageType == Message.TYPE_MESSAGE_UNSUPPORTED) {
+            throw new IllegalStateException();
+        }
+        
+        if (messageType == Message.TYPE_MESSAGE_4S) {
+            mCall.setVisibility(View.VISIBLE);
+            mNavigate.setVisibility(View.VISIBLE);
+        } else {
+            mCall.setVisibility(View.GONE);
+            mNavigate.setVisibility(View.GONE);
+        }
+        
+        // Cancel the load task if it is running
+        rescheduleLoadMessageListTask(messageType);
+        
+    }
+
+    private void rescheduleLoadMessageListTask(int messageType) {
+        Utilities.cancelTaskInterrupt(mLoadMessageListTask);
+        mLoadMessageListTask = null;
+        
+        if (messageType == Message.TYPE_MESSAGE_NO_TYPE) {
+            return;
+        }
+        mLoadMessageListTask = new LoadMessageListTask(messageType);
+        mLoadMessageListTask.execute();
+    }
+    
+    private void rescheduleLoadMessageTask(long messageId) {
+        Utilities.cancelTaskInterrupt(mLoadMessageTask);
+        mLoadMessageTask = null;
+        
+        if (messageId == Message.TYPE_MESSAGE_NO_TYPE) {
+            return;
+        }
+        mLoadMessageTask = new LoadMessageTask(messageId);
+        mLoadMessageTask.execute();
+    }
+
+    private int getMessageType(String tabId) {
+        int messageType = Message.TYPE_MESSAGE_UNSUPPORTED;
+        
+        if (TAG_4S_TAB.equals(tabId)) {
+            messageType = Message.TYPE_MESSAGE_4S;
+        } else if (TAG_SYSTEM_TAB.equals(tabId)) {
+            messageType = Message.TYPE_MESSAGE_SYSTEM;
+        } else if (TAG_STORES_TAB.equals(tabId)) {
+            messageType = Message.TYPE_MESSAGE_STORES;
+        }
+        return messageType;
+    }
+    
+    private int getTabIndex(int messageType) {
+        int tabId = -1;
+        if (messageType == Message.TYPE_MESSAGE_4S) {
+            tabId = TAB_ID_4S;
+        } else if (messageType == Message.TYPE_MESSAGE_SYSTEM) {
+            tabId = TAB_ID_SYSTEM;
+        } else if (messageType == Message.TYPE_MESSAGE_STORES) {
+            tabId = TAB_ID_STORES;
+        }
+        return tabId;
+    }
+    
+    @Override
+    public void onClick(View view) {
+        switch (view.getId()) {
+        case R.id.action_call:
+            if(mMessage != null && m4SStore != null){
+                onCall4SStore();
+            }
+            break;
+        case R.id.action_navi:
+            if(mMessage != null && m4SStore != null){
+                onNagi4SStore();
+            }
+            break;
+        case R.id.action_delete:
+            if (mMessage != null) {
+                onDeleteMessage(mMessage.mId);
+                clearMessageView();
+            }
+            
+            break;
+        }
+    }
+
+    private void onCall4SStore() {
+        String telNumber = m4SStore.mTelephone;
+        if (telNumber.trim().length() != 0) {
+            Intent phoneIntent = new Intent("android.intent.action.CALL",
+                    Uri.parse("tel:" + telNumber));
+            startActivity(phoneIntent);
+        } else {
+            Toast.makeText(MessageList.this.getApplicationContext(),
+                    R.string.call_number_nonexistent, Toast.LENGTH_SHORT)
+                    .show();
+        }
+    }
+    
+    private void onNagi4SStore() {
+        try {
+            final Intent intent = new Intent(ACTION_MAP_ROUTE);
+            intent.putParcelableArrayListExtra(POINTLIST_KEY, setPointList());
+            intent.putExtra(ROUTE_TYPE_KEY, ROUTE_NEAREST);
+            startActivity(intent);
+        } catch (ActivityNotFoundException anfe) {
+            Toast.makeText(getApplicationContext(),
+                    R.string.no_navigate_application, Toast.LENGTH_SHORT)
+                    .show();
+        }
+    }
+    
+    private ArrayList<Bundle> setPointList() {
+        Bundle pointCar = locationCar();
+        final Bundle point4S = new Bundle();
+        point4S.putFloat(LATITUDE_KEY, (float) m4SStore.mLat);
+        point4S.putFloat(LONGITUDE_KEY, (float) m4SStore.mLng);
+        final ArrayList<Bundle> pointList = new ArrayList<Bundle>();
+        pointList.add(pointCar);
+        pointList.add(point4S);
+        return pointList;
+        
+    }
+    
+    private Bundle locationCar() {
+        mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        final Bundle pointCar = new Bundle();
+        Criteria criteria = new Criteria();
+        criteria.setAccuracy(Criteria.ACCURACY_FINE);
+        criteria.setAltitudeRequired(false);
+        criteria.setBearingRequired(false);
+        criteria.setCostAllowed(true);
+        criteria.setPowerRequirement(Criteria.POWER_LOW);
+        String provider = mLocationManager.getBestProvider(criteria, true);
+        mLocationManager.requestLocationUpdates(provider, 60000, 1, this);
+        Location location = mLocationManager.getLastKnownLocation(provider);
+        if (location != null) {
+            double latCar = location.getLatitude();
+            double lngCar = location.getLongitude();
+
+            pointCar.putFloat(LATITUDE_KEY, (float) latCar);
+            pointCar.putFloat(LONGITUDE_KEY, (float) lngCar);
+            Toast.makeText(getApplicationContext(), latCar + ";" + lngCar,
+                    Toast.LENGTH_SHORT).show();
+        }else {
+            Toast.makeText(getApplicationContext(), "无法获取位置，请重试",
+                    Toast.LENGTH_SHORT).show();
+        }
+        return pointCar;
+    }
+    
+    private void onDeleteMessage(long messageId) {
+        ContentResolver resolver = getApplicationContext().getContentResolver();
+        resolver.delete(Uri.withAppendedPath(mMessage.mBaseUri, String.valueOf(messageId)), null, null);
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+        // TODO Auto-generated method stub
+        
+    }
+
+}

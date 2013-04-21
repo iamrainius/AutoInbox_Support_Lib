@@ -1,0 +1,203 @@
+package com.borqs.ai.activity;
+
+import java.util.Date;
+
+import android.app.Activity;
+import android.content.Context;
+import android.database.Cursor;
+import android.os.Bundle;
+import android.support.v4.app.ListFragment;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.app.LoaderManager.LoaderCallbacks;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
+import android.support.v4.widget.CursorAdapter;
+import android.text.TextUtils;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.ListView;
+import android.widget.TextView;
+
+import com.borqs.ai.AutoInbox;
+import com.borqs.ai.MessageProvider;
+import com.borqs.ai.R;
+import com.borqs.ai.provider.AutoInboxContent.Message;
+
+public class MessageListFragment extends ListFragment {
+    private static final int LOADER_ID_MESSAGE_LIST_LOADER = 0;
+    public static final int SNIPPET_MAX_LENGTH = 30;
+    
+    private Callback mCallback;
+    private MessageListAdapter mAdapter;
+    private int mProviderType = MessageProvider.TYPE_NO_TYPE;
+    private long mMessageId = Message.NO_MESSAGE;;
+
+    public interface Callback {
+        public void onMessageSelected(long messageId);
+    }
+    
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, this + " onCreate");
+        }
+        
+        super.onCreate(savedInstanceState);
+        mAdapter = new MessageListAdapter(getActivity());
+        this.setListAdapter(mAdapter);
+    }
+
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, this + " onActivityCreated");
+        }
+        super.onActivityCreated(savedInstanceState);
+        
+        LoaderManager lm = this.getLoaderManager();
+        lm.initLoader(LOADER_ID_MESSAGE_LIST_LOADER, null, LOADER_CALLBACKS);
+    }
+    
+    @Override
+    public void onAttach(Activity activity) {
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, this + " onAttach");
+        }
+        
+        super.onAttach(activity);
+        try {
+            mCallback = (Callback) activity;
+        } catch (ClassCastException e) {
+            throw new ClassCastException(activity.toString() + " must implement MessageListFragment.Callback");
+        }
+    }
+    
+    @Override
+    public void onStart() {
+        if (AutoInbox.DEBUG) {
+            Log.d(AutoInbox.TAG, this + " onStart");
+        }
+        
+        super.onStart();
+    }
+
+    @Override
+    public void onListItemClick(ListView l, View v, int position, long id) {
+        MessageListItem itemView = (MessageListItem) v;
+        if (itemView != null) {
+            mCallback.onMessageSelected(itemView.mMessageId);
+        }
+    }
+
+    public void updateMessageList(int providerType, long messageId) {
+        mProviderType = providerType;
+        mMessageId  = messageId;
+        getLoaderManager().restartLoader(LOADER_ID_MESSAGE_LIST_LOADER, null, LOADER_CALLBACKS);
+    }
+    
+    private static final String[] MESSAGE_LIST_PROJECTION = {
+        Message.ID, Message.SUBJECT, Message.BODY, 
+        Message.FLAG_READ, Message.TIMESTAMP
+    };
+    
+    private final LoaderCallbacks<Cursor> LOADER_CALLBACKS = new LoaderManager.LoaderCallbacks<Cursor>() {
+
+        @Override
+        public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+            String selection = Message.TYPE + "=" + mProviderType + " order by "
+                    + Message.RECORD_ID + " desc ";
+            
+            CursorLoader loader = new CursorLoader(getActivity(), Message.CONTENT_URI, 
+                    MESSAGE_LIST_PROJECTION, selection, null, null);
+            return loader;
+        }
+
+        @Override
+        public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+            mAdapter.swapCursor(data);
+            
+            long messageId = mMessageId;
+            
+            if (data.moveToFirst()) {
+                if (messageId == Message.NO_MESSAGE) {
+                    messageId = data.getLong(MessageListAdapter.COLUMN_ID);
+                } else {
+
+                }
+            }
+           
+            mCallback.onMessageSelected(messageId);
+        }
+
+        @Override
+        public void onLoaderReset(Loader<Cursor> loader) {
+            mAdapter.swapCursor(null);
+        }
+        
+    };
+    
+    private class MessageListAdapter extends CursorAdapter {
+        public static final int COLUMN_ID = 0;
+        public static final int COLUMN_SUBJECT = 1;
+        public static final int COLUMN_BODY = 2;
+        public static final int COLUMN_FLAG_READ = 3;
+        public static final int COLUMN_TIMESTAMP = 4;
+        
+        private Context mContext;
+        private java.text.DateFormat mDateFormat;
+        private java.text.DateFormat mTimeFormat;
+        private LayoutInflater mInflater;
+        
+        public MessageListAdapter(Context context) {
+            super(context, null, true);
+            mContext = context;
+            mDateFormat = android.text.format.DateFormat.getDateFormat(context);
+            mTimeFormat = android.text.format.DateFormat.getTimeFormat(context);
+            mInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        }
+
+        @Override
+        public void bindView(View view, Context context, Cursor cursor) {
+            MessageListItem itemView = (MessageListItem) view;
+            
+            itemView.mMessageId = cursor.getLong(COLUMN_ID);
+            
+            TextView subjectView = (TextView) view.findViewById(R.id.subject);
+            String subjectText = cursor.getString(COLUMN_SUBJECT);
+            subjectView.setText(subjectText);
+            
+            TextView snippetView = (TextView) view.findViewById(R.id.snippet);
+            String body = cursor.getString(COLUMN_BODY);
+            if (!TextUtils.isEmpty(body) && body.length() > SNIPPET_MAX_LENGTH) {
+                body = body.substring(0, SNIPPET_MAX_LENGTH);
+            }
+            snippetView.setText(body);
+            
+            ImageView readView = (ImageView) view.findViewById(R.id.read_flag);
+            int readFlag = cursor.getInt(COLUMN_FLAG_READ);
+            if (readFlag == Message.UNREAD) {
+                readView.setBackgroundResource(R.drawable.unread);
+            } else {
+                readView.setBackgroundResource(R.drawable.read);
+            }
+            
+            TextView dateView = (TextView) view.findViewById(R.id.datetime);
+            long timestamp = cursor.getLong(COLUMN_TIMESTAMP);
+            
+            Date date = new Date(timestamp);
+            String dateText;
+            // we need add code to check whether the message comes within today
+            dateText = mDateFormat.format(date);
+            dateView.setText(dateText);
+        }
+
+        @Override
+        public View newView(Context arg0, Cursor arg1, ViewGroup parent) {
+            return mInflater.inflate(R.layout.message_list_item, parent, false);
+        }
+        
+    }
+}

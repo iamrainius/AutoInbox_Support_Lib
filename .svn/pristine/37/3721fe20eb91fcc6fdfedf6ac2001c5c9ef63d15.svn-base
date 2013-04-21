@@ -1,0 +1,15 @@
+<resources>
+    
+    <dimen name="padding_small">2dp</dimen>
+    <dimen name="padding_medium">8dp</dimen>
+    <dimen name="padding_large">16dp</dimen>
+
+    <!-- add for app widget -->
+    <dimen name="widget_margin">0dip</dimen>
+
+    <dimen name="widget_margin_text">20dp</dimen>
+
+    <dimen name="widget_small_text_size">18sp</dimen>
+    <dimen name="widget_middle_text_size">30sp</dimen>
+    <dimen name="widget_lager_text_size">50sp</dimen>
+</resources>
